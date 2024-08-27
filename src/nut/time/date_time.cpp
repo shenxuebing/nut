@@ -392,7 +392,7 @@ double DateTime::to_double() const noexcept
     return _seconds + _nanoseconds / (double) NSECS_PER_SEC;
 }
 
-// for example : "2007-3-12"
+// for example : "2007-03-12"
 std::string DateTime::get_date_str() const noexcept
 {
     return format_time("%Y-%m-%d");
@@ -404,7 +404,7 @@ std::string DateTime::get_clock_str() const noexcept
     return format_time("%H:%M:%S.%9f");
 }
 
-// for example : "2007-3-4 8:33:57.762917263"
+// for example : "2007-03-04 8:33:57.762917263"
 std::string DateTime::get_datetime_str() const noexcept
 {
     return get_date_str() + " " + get_clock_str();

@@ -63,8 +63,29 @@ static void print_help()
         std::endl;
 }
 
+void testT(TimeWheel::timer_id_type a , int64_t b)
+{
+    std::cout << "test_nut [-h] [-g GROUP] [-f FIXTURE] [-c CASE_FIXTURE CASE_NAME]" <<
+        std::endl;
+}
+
+void testT1(TimerHeap::timer_id_type a, const TimeDiff& b)
+{
+    std::cout << "test_nut [-h] [-g GROUP] [-f FIXTURE] [-c CASE_FIXTURE CASE_NAME]" <<
+        std::endl;
+}
 int main(int argc, char *argv[])
 {
+
+    TimeWheel t1;
+    TimeWheel::timer_id_type id1 = t1.add_timer(100,200, testT);
+    t1.tick();
+    TimerHeap t2;
+    TimeDiff nowTime;
+    nowTime.set(2);
+    t2.add_timer(nowTime, testT1);
+  //  t2.run();
+    system("pause");
 #if NUT_PLATFORM_OS_LINUX
     // 解决 std::wcout 无法显示中文以及 char/wchar_t 相互转换问题
     ::setlocale(LC_ALL, "zh_CN.UTF8");

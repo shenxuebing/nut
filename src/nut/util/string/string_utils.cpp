@@ -852,17 +852,29 @@ NUT_API std::string url_decode(const std::string& s)
 {
     return url_decode(s.c_str());
 }
+static const char NUTHEXSTR_UPPER[] = "0123456789ABCDEF";
+static const char NUTHEXSTR_LOWER[] = "0123456789abcdef";
 
-NUT_API std::string hex_encode(const void *data, size_t cb, bool upper_case)
+NUT_API std::string hex_encode(const void* data, size_t cb, bool upper_case)
 {
     assert(nullptr != data);
-
+    const char* hexStr;
     std::string result;
+    if (upper_case)
+    {
+        hexStr = NUTHEXSTR_UPPER;
+    }
+    else
+    {
+        hexStr = NUTHEXSTR_LOWER;
+    }
     for (size_t i = 0; i < cb; ++i)
     {
-        const uint8_t b = ((const uint8_t*) data)[i];
-        result.push_back(int_to_char((b >> 4) & 0x0f, upper_case));
-        result.push_back(int_to_char(b & 0x0f, upper_case));
+        const uint8_t b = ((const uint8_t*)data)[i];
+        //result.push_back(int_to_char((b >> 4) & 0x0f, upper_case));
+        //result.push_back(int_to_char(b & 0x0f, upper_case));
+        result.push_back(hexStr[(b >> 4) & 0x0f]);
+        result.push_back(hexStr[b & 0x0f]);
     }
     return result;
 }
@@ -1195,6 +1207,143 @@ NUT_API std::vector<uint8_t> base64_decode(const char *s, ssize_t len)
 NUT_API std::vector<uint8_t> base64_decode(const std::string& s)
 {
     return base64_decode(s.c_str());
+}
+
+
+NUT_API std::string to_lower(const char* s, ssize_t len)
+{
+    assert(nullptr != s);
+    std::string result;
+    for (int i = 0; 0 != s[i] && (len < 0 || i < len); ++i)
+    {
+        if ('A' <= s[i] && s[i] <= 'Z')
+            result.push_back(s[i] + 32);
+        else
+            result.push_back(s[i]);
+    }
+    return result;
+}
+NUT_API std::string to_lower(const std::string& s)
+{
+    return to_lower(s.c_str());
+}
+
+NUT_API std::wstring to_lower(const wchar_t* s, ssize_t len)
+{
+    assert(nullptr != s);
+    std::wstring result;
+    for (int i = 0; 0 != s[i] && (len < 0 || i < len); ++i)
+    {
+        if (L'A' <= s[i] && s[i] <= L'Z')
+            result.push_back(s[i] + 32);
+        else
+            result.push_back(s[i]);
+    }
+    return result;
+}
+NUT_API std::wstring to_lower(const std::wstring& s)
+{
+    return to_lower(s.c_str());
+
+}
+NUT_API std::string to_upper(const char* s, ssize_t len)
+{
+    assert(nullptr != s);
+    std::string result;
+    for (int i = 0; 0 != s[i] && (len < 0 || i < len); ++i)
+    {
+        if ('a' <= s[i] && s[i] <= 'z')
+            result.push_back(s[i] - 32);
+        else
+            result.push_back(s[i]);
+    }
+    return result;
+}
+
+NUT_API std::string to_upper(const std::string& s)
+{
+    return to_upper(s.c_str());
+}
+
+NUT_API std::wstring to_upper(const wchar_t* s, ssize_t len)
+{
+    assert(nullptr != s);
+    std::wstring result;
+    for (int i = 0; 0 != s[i] && (len < 0 || i < len); ++i)
+    {
+        if (L'a' <= s[i] && s[i] <= L'z')
+            result.push_back(s[i] - 32);
+        else
+            result.push_back(s[i]);
+    }
+    return result;
+}
+
+NUT_API std::wstring to_upper(const std::wstring& s)
+{
+    return to_upper(s.c_str());
+}
+
+NUT_API std::string replace(const char* s, const char* from, const char* to)
+{
+    assert(nullptr != s && nullptr != from && nullptr != to);
+    /*std::string str = s;
+    std::string t=from;
+    std::string w=to;
+    std::string::size_type pos = str.find(t), t_size = t.size(), r_size = w.size();
+    while (pos != std::string::npos)
+    { // found
+        str.replace(pos, t_size, w);
+        pos = str.find(t, pos + r_size);
+    }
+    return str;*/   
+    std::string result;
+    const size_t from_len = ::strlen(from);
+    for (size_t i = 0; 0 != s[i];)
+    {
+        if (0 == ::strncmp(s + i, from, from_len))
+        {
+            result += to;
+            i += from_len;
+        }
+        else
+        {
+            result.push_back(s[i]);
+            ++i;
+        }
+    }
+    return result;
+}
+
+NUT_API std::string replace(const std::string& s, const std::string& from, const std::string& to)
+{
+    return replace(s.c_str(), from.c_str(), to.c_str());
+}
+
+NUT_API std::wstring replace(const wchar_t* s, const wchar_t* from, const wchar_t* to)
+{
+    assert(nullptr != s && nullptr != from && nullptr != to);
+    std::wstring result;
+    const size_t from_len = ::wcslen(from);
+    for (size_t i = 0; 0 != s[i];)
+    {
+        if (0 == ::wcsncmp(s + i, from, from_len))
+        {
+            result += to;
+            i += from_len;
+        }
+        else
+        {
+            result.push_back(s[i]);
+            ++i;
+        }
+    }
+    return result;
+}
+
+NUT_API std::wstring replace(const std::wstring& s, const std::wstring& from, const std::wstring& to)
+{
+    return replace(s.c_str(), from.c_str(), to.c_str());
 }
 
 }

@@ -5,6 +5,10 @@
 #include <nut/util/string/string_utils.h>
 #include <nut/util/string/to_string.h>
 
+
+#include <nut/time/time_diff.h>
+#include <string>
+
 using namespace std;
 using namespace nut;
 
@@ -24,6 +28,10 @@ class TestStringUtils : public TestFixture
         NUT_REGISTER_CASE(test_hex_encoding);
         NUT_REGISTER_CASE(test_cstyle_encoding);
         NUT_REGISTER_CASE(test_base64_encoding);
+        NUT_REGISTER_CASE(test_to_lower);
+        NUT_REGISTER_CASE(test_to_upper);
+        NUT_REGISTER_CASE(test_replace);
+        
     }
 
     void test_split()
@@ -54,7 +62,7 @@ class TestStringUtils : public TestFixture
         // NUT_TA(wtmp == L"1,am,s,1.230000");
 
         // wchar_t* 格式化要用 %S 或者 %ls
-        NUT_TA(format(L"%d,%S,%c,%f", 1, L"am", L's', 1.23) == L"1,am,s,1.230000");
+        NUT_TA(format(L"%d,%s,%c,%f", 1, L"am", L's', 1.23) == L"1,am,s,1.230000");
 #endif
     }
 
@@ -157,8 +165,22 @@ class TestStringUtils : public TestFixture
 
     void test_hex_encoding()
     {
+        std::string str = "abcdefghi";
+        int count = 10000000;
+        TimeDiffEx df;
+        /*for (size_t i = 0; i < count; i++)
+        {
+            hex_encode(str.c_str(), str.length());
+        }
+        std::cout << "0:::::" << df.elapsedMicroseconds() << endl;
+        TimeDiffEx df1;
+        for (size_t i = 0; i < count; i++)
+        {
+            hex_encode1(str.c_str(), str.length());
+        }
+        std::cout <<"1:::::"<< df1.elapsedMicroseconds()<<endl;*/
         NUT_TA(hex_encode("\x03\xfA", 2) == "03FA");
-
+        //NUT_TA(hex_encode(NULL, 2) == "03FA");
         std::vector<uint8_t> v = hex_decode("03 FA\t");
         NUT_TA(v.size() == 2);
         NUT_TA(v[0] == 0x03);
@@ -194,6 +216,36 @@ class TestStringUtils : public TestFixture
         NUT_TA(v.size() == 8);
         NUT_TA(0 == ::strncmp((const char*)&v[0], "abcdefgh", 8));
     }
+    void test_to_lower()
+    {
+        NUT_TA(to_lower("ABC") == "abc");
+        NUT_TA(to_lower("abc") == "abc");
+        NUT_TA(to_lower("AbC") == "abc");
+        NUT_TA(to_lower("aBc") == "abc");
+        NUT_TA(to_lower("aBC") == "abc");
+        NUT_TA(to_lower("Abc") == "abc");
+        NUT_TA(to_lower("ABc") == "abc");
+        NUT_TA(to_lower("abC") == "abc");
+    }
+
+    void test_to_upper()
+    {
+        NUT_TA(to_upper("ABC") == "ABC");
+        NUT_TA(to_upper("abc") == "ABC");
+        NUT_TA(to_upper("AbC") == "ABC");
+        NUT_TA(to_upper("aBc") == "ABC");
+        NUT_TA(to_upper("aBC") == "ABC");
+        NUT_TA(to_upper("Abc") == "ABC");
+        NUT_TA(to_upper("ABc") == "ABC");
+        NUT_TA(to_upper("abC") == "ABC");
+    }
+    void test_replace()
+    {
+        NUT_TA(replace("abc", "b", "d") == "adc");
+        NUT_TA(replace("abc", "ab", "c") == "cc");
+        NUT_TA(replace("abc", "abc", "d") == "d");
+    }
+        
 };
 
 NUT_REGISTER_FIXTURE(TestStringUtils, "util, string, quiet")

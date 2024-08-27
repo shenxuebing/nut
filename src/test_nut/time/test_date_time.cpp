@@ -1,6 +1,7 @@
 ﻿
 #include <math.h>
 #include <iostream>
+#include <thread>
 
 #include <nut/unittest/unittest.h>
 #include <nut/time/date_time.h>
@@ -45,6 +46,21 @@ class TestDateTime : public TestFixture
 
     void test_bug1()
     {
+        DateTime st,et;
+       
+        st.set_to_now();
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        et.set_to_now();
+        TimeDiff df = et - st;
+        NUT_TA(df.get_seconds() == 2);
+        TimeDiffEx dfex;
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        long elapsedSeconds = dfex.elapsedSeconds();
+        long elapsedNanoSeconds = dfex.elapsedNanoSeconds();
+        long elapsedMicroseconds = dfex.elapsedMicroseconds();
+        long elapsed = dfex.elapsed();
+        NUT_TA(elapsedSeconds == 2);
+
         DateTime t(2018, 10, 16, 16, 01, 55, 987654321); // dirty = false
         t -= TimeDiff(8 * 60 * 60); // dirty = true
         NUT_TA(t.to_string() == "2018-10-16 08:01:55.987654321"); // update struct tm

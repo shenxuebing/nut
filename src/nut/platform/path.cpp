@@ -1225,4 +1225,21 @@ bool Path::is_file(const std::wstring& path) noexcept
 #endif
 }
 
+
+std::string Path::get_tmpDir()noexcept
+{
+    std::string dirPath;
+#if NUT_PLATFORM_OS_WINDOWS
+    char tmpPath[MAX_PATH] = { 0 };
+    if (GetTempPathA(MAX_PATH, tmpPath)>0)
+    {
+        dirPath = tmpPath;
+    }    
+#else
+    dirPath = "/tmp/";
+#endif
+    return dirPath;
+}
+
+
 }

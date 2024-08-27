@@ -220,6 +220,29 @@ NUT_API std::string base64_encode(const void *data, size_t cb);
 NUT_API std::vector<uint8_t> base64_decode(const char *s, ssize_t len = -1);
 NUT_API std::vector<uint8_t> base64_decode(const std::string& s);
 
+/**
+ * 大小写转换.
+ */
+NUT_API std::string to_lower(const char* s, ssize_t len = -1);
+NUT_API std::string to_lower(const std::string& s);
+NUT_API std::wstring to_lower(const wchar_t* s, ssize_t len = -1);
+NUT_API std::wstring to_lower(const std::wstring& s);
+
+NUT_API std::string to_upper(const char* s, ssize_t len = -1);
+NUT_API std::string to_upper(const std::string& s);
+NUT_API std::wstring to_upper(const wchar_t* s, ssize_t len = -1);
+NUT_API std::wstring to_upper(const std::wstring& s);
+
+/**
+ * 字符串替换.
+ */
+NUT_API std::string replace(const char* s, const char* from, const char* to);
+NUT_API std::string replace(const std::string& s, const std::string& from, const std::string& to);
+NUT_API std::wstring replace(const wchar_t* s, const wchar_t* from, const wchar_t* to);
+NUT_API std::wstring replace(const std::wstring& s, const std::wstring& from, const std::wstring& to);
+
+
+
 }
 
 #endif /* head file guarder */
