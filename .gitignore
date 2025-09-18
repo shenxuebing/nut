@@ -1,0 +1,9 @@
+*~
+.DS_Store
+*.tmp
+
+/.dir-locals.el
+/tmp
+/.vs
+/build
+/build-linux/Debug-SHARED
