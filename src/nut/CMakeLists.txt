@@ -87,6 +87,7 @@ if(PLATFORM_LINUX)
     # 查找并链接原子操作库和dl库
     if(ATOMIC_LIBRARY)
         target_link_libraries(nut PUBLIC ${ATOMIC_LIBRARY})
+        message(STATUS "Linking nut with atomic library: ${ATOMIC_LIBRARY}")
     endif()
     
     if(DL_LIBRARY)

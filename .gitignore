@@ -7,3 +7,6 @@
 /.vs
 /build
 /build-linux/Debug-SHARED
+/build-linux
+/out/build/x86-Debug
+/proj

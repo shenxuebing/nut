@@ -159,7 +159,26 @@ endif()
 if(PLATFORM_LINUX)
     find_package(Threads REQUIRED)
     find_library(DL_LIBRARY dl)
+    
+    # 查找 atomic 库，某些系统需要显式链接
     find_library(ATOMIC_LIBRARY atomic)
+    if(NOT ATOMIC_LIBRARY)
+        # 如果找不到 atomic 库，尝试检查是否需要链接
+        include(CheckCXXSourceCompiles)
+        set(CMAKE_REQUIRED_FLAGS "-std=c++11")
+        check_cxx_source_compiles("
+            #include <atomic>
+            int main() {
+                std::atomic<__int128> x{0};
+                return x.compare_exchange_strong(x, x);
+            }" ATOMIC_BUILTIN)
+        
+        if(NOT ATOMIC_BUILTIN)
+            # 需要链接 atomic 库
+            set(ATOMIC_LIBRARY "atomic")
+            message(STATUS "Will link with atomic library for 128-bit atomic operations")
+        endif()
+    endif()
 endif()
 
 # 包含目录
