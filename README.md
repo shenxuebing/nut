@@ -186,5 +186,6 @@ int main() {
 - **完整文本**：见仓库根目录 LICENSE
 
 ## 鸣谢与贡献
+- 本项目原仓库地址：[https://github.com/jingqi/nut](https://github.com/jingqi/nut)，因原仓库长期未更新，现已独立维护。
 - 欢迎提交 Issue / PR 改进功能或文档
 - 任何建议都将帮助 Nut 变得更好
