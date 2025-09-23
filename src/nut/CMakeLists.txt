@@ -20,8 +20,13 @@ message(STATUS "Found ${SOURCE_COUNT} source files and ${HEADER_COUNT} header fi
 if(WIN32)
     add_library(nut ${NUT_LIBRARY_TYPE} ${NUT_SOURCES} ${NUT_HEADERS})
 else()
-    # 非Windows平台默认创建动态库
-    add_library(nut SHARED ${NUT_SOURCES} ${NUT_HEADERS})
+    # 非Windows平台也支持NUT_LIBRARY_TYPE配置
+    if(DEFINED NUT_LIBRARY_TYPE)
+        add_library(nut ${NUT_LIBRARY_TYPE} ${NUT_SOURCES} ${NUT_HEADERS})
+    else()
+        # 默认创建动态库
+        add_library(nut SHARED ${NUT_SOURCES} ${NUT_HEADERS})
+    endif()
 endif()
 
 # 如果在 Windows 且构建为静态库，给静态库文件名添加后缀以避免与动态库冲突
@@ -40,22 +45,31 @@ set_target_properties(nut PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
-# Windows特定设置
-if(WIN32 AND MSVC)
-    if(NUT_LIBRARY_TYPE STREQUAL "STATIC")
-        # 静态库特定设置
-        target_compile_definitions(nut PUBLIC NUT_STATIC_LIB)
+# 库类型特定设置
+if(NUT_LIBRARY_TYPE STREQUAL "STATIC")
+    # 静态库特定设置
+    target_compile_definitions(nut PUBLIC NUT_STATIC_LIB)
+    if(WIN32)
         set_target_properties(nut PROPERTIES
             OUTPUT_NAME "nut_static"
         )
-        message(STATUS "Building nut as static library")
     else()
-        # 动态库特定设置
-        target_compile_definitions(nut PRIVATE BUILDING_NUT_DLL)
-        target_compile_definitions(nut PUBLIC NUT_SHARED_LIB)
-        message(STATUS "Building nut as dynamic library")
+        # Linux/macOS静态库设置
+        set_target_properties(nut PROPERTIES
+            OUTPUT_NAME "nut"
+            ARCHIVE_OUTPUT_NAME "nut"
+        )
     endif()
-    
+    message(STATUS "Building nut as static library")
+else()
+    # 动态库特定设置
+    target_compile_definitions(nut PRIVATE BUILDING_NUT_DLL)
+    target_compile_definitions(nut PUBLIC NUT_SHARED_LIB)
+    message(STATUS "Building nut as dynamic library")
+endif()
+
+# Windows特定设置
+if(WIN32 AND MSVC)
     # 设置运行时库
     set_property(TARGET nut PROPERTY
         MSVC_RUNTIME_LIBRARY ${CMAKE_MSVC_RUNTIME_LIBRARY}
@@ -116,8 +130,8 @@ install(TARGETS nut
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-# 为开发构建创建符号链接（仅Unix系统）
-if(UNIX AND NOT APPLE)
+# 为开发构建创建符号链接（仅Unix系统的动态库）
+if(UNIX AND NOT APPLE AND NUT_LIBRARY_TYPE STREQUAL "SHARED")
     add_custom_command(TARGET nut POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E create_symlink
         $<TARGET_FILE:nut>
@@ -158,7 +172,7 @@ endif()
 
 # 输出库信息
 message(STATUS "NUT Library Configuration:")
-message(STATUS "  Library Type: SHARED")
+message(STATUS "  Library Type: ${NUT_LIBRARY_TYPE}")
 message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  Sources: ${SOURCE_COUNT} files")
 message(STATUS "  Headers: ${HEADER_COUNT} files")

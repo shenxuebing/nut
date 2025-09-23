@@ -20,6 +20,38 @@ function do_config_build() {
 
   echo "==> Artifacts (${build_type} ${lib_type}):"
   find "${bdir}" -type f \( -name "*.so" -o -name "*.a" -o -name "*.exe" -o -name "*.out" \) | sort
+  
+  # 验证库类型
+  echo "==> Library Type Verification:"
+  STATIC_LIB=$(find "${bdir}" -name "*.a" | head -1)
+  SHARED_LIB=$(find "${bdir}" -name "*.so" | head -1)
+  
+  if [ "$lib_type" = "STATIC" ]; then
+    if [ -n "$STATIC_LIB" ]; then
+      echo "✅ Static library found: $STATIC_LIB"
+      file "$STATIC_LIB"
+    else
+      echo "❌ No static library (.a) found!"
+    fi
+    if [ -n "$SHARED_LIB" ]; then
+      echo "❌ Unexpected shared library found: $SHARED_LIB"
+    else
+      echo "✅ Correct: No shared library (.so) generated"
+    fi
+  else
+    if [ -n "$SHARED_LIB" ]; then
+      echo "✅ Shared library found: $SHARED_LIB"
+      file "$SHARED_LIB"
+    else
+      echo "❌ No shared library (.so) found!"
+    fi
+    if [ -n "$STATIC_LIB" ]; then
+      echo "❌ Unexpected static library found: $STATIC_LIB"
+    else
+      echo "✅ Correct: No static library (.a) generated"
+    fi
+  fi
+  echo ""
 }
 
 # Optional: choose generator (uncomment if you prefer Ninja)
