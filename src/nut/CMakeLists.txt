@@ -149,7 +149,11 @@ endif()
 # 为调试版本添加调试信息
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        target_compile_options(nut PRIVATE -g3 -ggdb)
+        if(BUILD_SHARED_LIBS)
+            target_compile_options(nut_shared PRIVATE -g3 -ggdb)
+        else()
+            target_compile_options(nut_static PRIVATE -g3 -ggdb)
+        endif()
     endif()
 endif()
 

@@ -61,6 +61,21 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+# 处理 NUT_LIBRARY_TYPE 变量（所有平台通用）
+if(DEFINED NUT_LIBRARY_TYPE)
+    if(NUT_LIBRARY_TYPE STREQUAL "STATIC")
+        set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
+        set(BUILD_STATIC_LIBS ON CACHE BOOL "Build static libraries" FORCE)
+        message(STATUS "NUT_LIBRARY_TYPE=STATIC: Building static library only")
+    elseif(NUT_LIBRARY_TYPE STREQUAL "SHARED")
+        set(BUILD_SHARED_LIBS ON CACHE BOOL "Build shared libraries" FORCE)
+        set(BUILD_STATIC_LIBS OFF CACHE BOOL "Build static libraries" FORCE)
+        message(STATUS "NUT_LIBRARY_TYPE=SHARED: Building shared library only")
+    else()
+        message(WARNING "NUT_LIBRARY_TYPE=${NUT_LIBRARY_TYPE} is not valid. Use STATIC or SHARED.")
+    endif()
+endif()
+
 # ============ Windows 平台其他配置 ============
 if(WIN32)
     
@@ -112,6 +127,15 @@ else()
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+    
+    # 非Windows平台的库类型选项
+    option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+    option(BUILD_STATIC_LIBS "Build static libraries" OFF)
+    
+    # 确保至少构建一种库
+    if(NOT BUILD_SHARED_LIBS AND NOT BUILD_STATIC_LIBS)
+        set(BUILD_STATIC_LIBS ON)
+    endif()
 endif()
 
 # 平台检测
