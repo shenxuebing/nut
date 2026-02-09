@@ -1,4 +1,45 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.15)
+
+# ============ CRT 配置必须在 project() 之前 ============
+if(WIN32)
+    # 确保 CMAKE_MSVC_RUNTIME_LIBRARY 策略生效
+    if(POLICY CMP0091)
+        cmake_policy(SET CMP0091 NEW)
+    endif()
+    
+    # 向后兼容：处理旧的变量名
+    if(DEFINED NUT_RUNTIME_LIBRARY)
+        if(NUT_RUNTIME_LIBRARY STREQUAL "MT")
+            set(STATIC_CRT ON CACHE BOOL "Build with static CRT (/MT)" FORCE)
+            message(STATUS "Detected NUT_RUNTIME_LIBRARY=MT, setting STATIC_CRT=ON")
+        else()
+            set(STATIC_CRT OFF CACHE BOOL "Build with static CRT (/MT)" FORCE)
+            message(STATUS "Detected NUT_RUNTIME_LIBRARY=MD, setting STATIC_CRT=OFF")
+        endif()
+    endif()
+    
+    if(DEFINED BUILD_RUNTIME)
+        if(BUILD_RUNTIME STREQUAL "MT")
+            set(STATIC_CRT ON CACHE BOOL "Build with static CRT (/MT)" FORCE)
+            message(STATUS "Detected BUILD_RUNTIME=MT, setting STATIC_CRT=ON")
+        else()
+            set(STATIC_CRT OFF CACHE BOOL "Build with static CRT (/MT)" FORCE)
+            message(STATUS "Detected BUILD_RUNTIME=MD, setting STATIC_CRT=OFF")
+        endif()
+    endif()
+    
+    # 使用统一的 STATIC_CRT 选项
+    option(STATIC_CRT "Build with static CRT (/MT)" OFF)
+    
+    # 设置 CMAKE_MSVC_RUNTIME_LIBRARY（必须在 project() 之前）
+    if(STATIC_CRT)
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        message(STATUS "NUT: Using static runtime library (/MT for Release, /MTd for Debug)")
+    else()
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>")
+        message(STATUS "NUT: Using dynamic runtime library (/MD for Release, /MDd for Debug)")
+    endif()
+endif()
 
 # 项目信息
 project(nut
@@ -20,29 +61,22 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-# 设置运行时库类型 (仅Windows)
+# ============ Windows 平台其他配置 ============
 if(WIN32)
-    # 保留 NUT_RUNTIME_LIBRARY 以控制 MSVC 运行时，但不再由它决定输出路径
-    set(NUT_RUNTIME_LIBRARY "MD" CACHE STRING "Runtime library type (MT/MD)")
-    set_property(CACHE NUT_RUNTIME_LIBRARY PROPERTY STRINGS "MT" "MD")
-
-    # 原来的 NUT_LIBRARY_TYPE 仍可控制库的构建类型（子项目可能使用），但输出路径不再按 shared/static 分裂
-    set(NUT_LIBRARY_TYPE "SHARED" CACHE STRING "Library type (SHARED/STATIC)")
-    set_property(CACHE NUT_LIBRARY_TYPE PROPERTY STRINGS "SHARED" "STATIC")
-
-    # 新增：通过 BUILD_RUNTIME 选择输出目录顶层（MD 或 MT），仅在 Windows 有效
-    if(NOT DEFINED BUILD_RUNTIME)
-      set(BUILD_RUNTIME "MD" CACHE STRING "Choose runtime dir for outputs: MD or MT (Windows only)")
+    
+    # 库类型选项
+    option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+    option(BUILD_STATIC_LIBS "Build static libraries" OFF)
+    
+    # 确保至少构建一种库
+    if(NOT BUILD_SHARED_LIBS AND NOT BUILD_STATIC_LIBS)
+        set(BUILD_STATIC_LIBS ON)
     endif()
-    string(TOUPPER "${BUILD_RUNTIME}" BUILD_RUNTIME)
-    if(NOT BUILD_RUNTIME STREQUAL "MD" AND NOT BUILD_RUNTIME STREQUAL "MT")
-      message(FATAL_ERROR "BUILD_RUNTIME must be either MD or MT (case-insensitive).")
-    endif()
-
-    set(OUT_DIR_BIN "${CMAKE_BINARY_DIR}/${BUILD_RUNTIME}/bin")
-    set(OUT_DIR_LIB "${CMAKE_BINARY_DIR}/${BUILD_RUNTIME}/lib")
-
-    # Ensure directories exist at configure time
+    
+    # 输出目录配置
+    set(OUT_DIR_BIN "${CMAKE_BINARY_DIR}/bin")
+    set(OUT_DIR_LIB "${CMAKE_BINARY_DIR}/lib")
+    
     file(MAKE_DIRECTORY "${OUT_DIR_BIN}")
     file(MAKE_DIRECTORY "${OUT_DIR_LIB}")
 
@@ -57,20 +91,22 @@ if(WIN32)
     endforeach()
 
     # 为避免静态库文件名与动态库冲突：在 Windows 下给静态库添加后缀 "_static"
-    # 这通过设置目标属性实现；子目录/目标如果显式设置了 OUTPUT_NAME/ARCHIVE_OUTPUT_NAME 则可能需调整。
     set_property(GLOBAL PROPERTY NUT_STATIC_LIB_SUFFIX "_static")
 
-    # 为兼容旧逻辑，仍按 NUT_RUNTIME_LIBRARY 设置 MSVC 运行时
-    if(MSVC)
-      if(NUT_RUNTIME_LIBRARY STREQUAL "MT")
-        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-        message(STATUS "Using static runtime library (MT/MTd)")
-      else()
-        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-        message(STATUS "Using dynamic runtime library (MD/MDd)")
-      endif()
-    endif()
-
+    # MSVC 设置
+    add_definitions(-DBUILDING_NUT -D_ENABLE_ATOMIC_ALIGNMENT_FIX)
+    
+    # 添加UTF-8编码支持
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /utf-8")
+    
+    # 禁用安全警告和其他警告
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4996 /wd4251 /wd4275")
+    
+    # 多处理器编译
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MP")
 else()
     # 非Windows平台的默认输出目录（保留原行为）
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -111,46 +147,23 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang
     
     # 平台特定设置
     if(PLATFORM_DARWIN)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+        add_compile_options(-stdlib=libc++)
     elseif(PLATFORM_LINUX)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -rdynamic")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -rdynamic")
+        add_compile_options(-rdynamic)
+        add_link_options(-rdynamic)
+        
+        # Linux下生成动态库时将libstdc++静态库打入
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++")
     endif()
-elseif(MSVC)
-    # MSVC 设置
-    add_definitions(-DBUILDING_NUT -D_ENABLE_ATOMIC_ALIGNMENT_FIX)
-    
-    # 添加UTF-8编码支持
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /utf-8")
-    
-    # 运行时库设置
-    if(NUT_RUNTIME_LIBRARY STREQUAL "MT")
-        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-        message(STATUS "Using static runtime library (MT/MTd)")
-    else()
-        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-        message(STATUS "Using dynamic runtime library (MD/MDd)")
-    endif()
-    
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        add_definitions(-DNDEBUG)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /O2")
-    else()
-        add_definitions(-DDEBUG)
-    endif()
-    
-    # 禁用安全警告和其他警告
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4996 /wd4251 /wd4275")
-    
-    # 多处理器编译
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MP")
 endif()
 
 # 添加构建定义
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_definitions(-DDEBUG)
+else()
+    add_definitions(-DNDEBUG)
+endif()
+
 if(NOT MSVC)
     add_definitions(-DBUILDING_NUT)
 endif()
@@ -232,8 +245,17 @@ message(STATUS "  Platform: ${PLATFORM_NAME}")
 message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
 if(WIN32)
-    message(STATUS "  Library Type: ${NUT_LIBRARY_TYPE}")
-    message(STATUS "  Runtime Library: ${NUT_RUNTIME_LIBRARY}")
+    if(BUILD_SHARED_LIBS)
+        message(STATUS "  Library Type: Shared")
+    endif()
+    if(BUILD_STATIC_LIBS)
+        message(STATUS "  Library Type: Static")
+    endif()
+    if(STATIC_CRT)
+        message(STATUS "  Runtime Library: Static CRT (/MT)")
+    else()
+        message(STATUS "  Runtime Library: Dynamic CRT (/MD)")
+    endif()
     message(STATUS "  Output Directory: ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 endif()
 message(STATUS "  Install Prefix: ${CMAKE_INSTALL_PREFIX}")

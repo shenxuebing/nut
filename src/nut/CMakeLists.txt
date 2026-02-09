@@ -16,125 +16,131 @@ list(LENGTH NUT_SOURCES SOURCE_COUNT)
 list(LENGTH NUT_HEADERS HEADER_COUNT)
 message(STATUS "Found ${SOURCE_COUNT} source files and ${HEADER_COUNT} header files for nut library")
 
-# 根据配置创建库（动态库或静态库）
-if(WIN32)
-    add_library(nut ${NUT_LIBRARY_TYPE} ${NUT_SOURCES} ${NUT_HEADERS})
-else()
-    # 非Windows平台也支持NUT_LIBRARY_TYPE配置
-    if(DEFINED NUT_LIBRARY_TYPE)
-        add_library(nut ${NUT_LIBRARY_TYPE} ${NUT_SOURCES} ${NUT_HEADERS})
-    else()
-        # 默认创建动态库
-        add_library(nut SHARED ${NUT_SOURCES} ${NUT_HEADERS})
-    endif()
+# 根据配置创建库（支持同时构建动态库和静态库）
+if(BUILD_SHARED_LIBS)
+    add_library(nut_shared SHARED ${NUT_SOURCES} ${NUT_HEADERS})
+    add_library(nut::nut_shared ALIAS nut_shared)
+    
+    set_target_properties(nut_shared PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+        OUTPUT_NAME "nut"
+        POSITION_INDEPENDENT_CODE ON
+    )
+    
+    target_compile_definitions(nut_shared PRIVATE BUILDING_NUT_DLL)
+    target_compile_definitions(nut_shared PUBLIC NUT_SHARED_LIB)
+    
+    message(STATUS "Building nut as shared library")
 endif()
 
-# 如果在 Windows 且构建为静态库，给静态库文件名添加后缀以避免与动态库冲突
-if(WIN32 AND NUT_LIBRARY_TYPE STREQUAL "STATIC")
-    get_property(_suf GLOBAL PROPERTY NUT_STATIC_LIB_SUFFIX)
-    if(_suf)
-        set_target_properties(nut PROPERTIES ARCHIVE_OUTPUT_NAME "nut${_suf}")
-    endif()
-endif()
-
-# 设置库属性
-set_target_properties(nut PROPERTIES
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
-    OUTPUT_NAME "nut"
-    POSITION_INDEPENDENT_CODE ON
-)
-
-# 库类型特定设置
-if(NUT_LIBRARY_TYPE STREQUAL "STATIC")
-    # 静态库特定设置
-    target_compile_definitions(nut PUBLIC NUT_STATIC_LIB)
-    if(WIN32)
-        set_target_properties(nut PROPERTIES
-            OUTPUT_NAME "nut_static"
-        )
-    else()
-        # Linux/macOS静态库设置
-        set_target_properties(nut PROPERTIES
-            OUTPUT_NAME "nut"
-            ARCHIVE_OUTPUT_NAME "nut"
-        )
-    endif()
+if(BUILD_STATIC_LIBS)
+    add_library(nut_static STATIC ${NUT_SOURCES} ${NUT_HEADERS})
+    add_library(nut::nut_static ALIAS nut_static)
+    
+    set_target_properties(nut_static PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+        OUTPUT_NAME "nut_static"
+        POSITION_INDEPENDENT_CODE ON
+    )
+    
+    target_compile_definitions(nut_static PUBLIC USE_STATIC_NUT_LIB NUT_STATIC_LIB)
+    
     message(STATUS "Building nut as static library")
+endif()
+
+# 创建通用别名指向首选库类型
+if(BUILD_SHARED_LIBS)
+    add_library(nut ALIAS nut_shared)
 else()
-    # 动态库特定设置
-    target_compile_definitions(nut PRIVATE BUILDING_NUT_DLL)
-    target_compile_definitions(nut PUBLIC NUT_SHARED_LIB)
-    message(STATUS "Building nut as dynamic library")
+    add_library(nut ALIAS nut_static)
 endif()
 
-# Windows特定设置
-if(WIN32 AND MSVC)
-    # 设置运行时库
-    set_property(TARGET nut PROPERTY
-        MSVC_RUNTIME_LIBRARY ${CMAKE_MSVC_RUNTIME_LIBRARY}
-    )
-endif()
+# CRT 配置由全局 CMAKE_MSVC_RUNTIME_LIBRARY 控制，不再单独设置
 
-# 包含目录
-target_include_directories(nut 
-    PUBLIC 
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
-# 编译定义
-target_compile_definitions(nut 
-    PRIVATE 
-        BUILDING_NUT
-)
-
-# 平台特定的链接库
-if(PLATFORM_LINUX)
-    target_link_libraries(nut 
+# 为所有库目标配置包含目录和编译定义的辅助函数
+function(configure_nut_target target_name)
+    target_include_directories(${target_name}
         PUBLIC 
-            Threads::Threads
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
     )
     
-    # 查找并链接原子操作库和dl库
-    if(ATOMIC_LIBRARY)
-        target_link_libraries(nut PUBLIC ${ATOMIC_LIBRARY})
-        message(STATUS "Linking nut with atomic library: ${ATOMIC_LIBRARY}")
-    endif()
-    
-    if(DL_LIBRARY)
-        target_link_libraries(nut PUBLIC ${DL_LIBRARY})
-    endif()
-    
-elseif(PLATFORM_DARWIN)
-    # macOS 特定设置
-    target_link_libraries(nut PUBLIC "-framework Foundation")
-    
+    target_compile_definitions(${target_name}
+        PRIVATE 
+            BUILDING_NUT
+    )
+endfunction()
+
+# 应用配置到所有库目标
+if(BUILD_SHARED_LIBS)
+    configure_nut_target(nut_shared)
+endif()
+if(BUILD_STATIC_LIBS)
+    configure_nut_target(nut_static)
 endif()
 
-# C++标准库链接
-if(NOT PLATFORM_DARWIN AND NOT PLATFORM_WINDOWS)
-    target_link_libraries(nut PUBLIC stdc++)
-elseif(PLATFORM_DARWIN)
-    target_link_libraries(nut PUBLIC c++)
+# 平台特定的链接库配置函数
+function(configure_nut_linking target_name)
+    if(PLATFORM_LINUX)
+        target_link_libraries(${target_name}
+            PUBLIC 
+                Threads::Threads
+        )
+        
+        if(ATOMIC_LIBRARY)
+            target_link_libraries(${target_name} PUBLIC ${ATOMIC_LIBRARY})
+        endif()
+        
+        if(DL_LIBRARY)
+            target_link_libraries(${target_name} PUBLIC ${DL_LIBRARY})
+        endif()
+        
+        target_link_libraries(${target_name} PUBLIC stdc++)
+        
+    elseif(PLATFORM_DARWIN)
+        target_link_libraries(${target_name} PUBLIC "-framework Foundation")
+        target_link_libraries(${target_name} PUBLIC c++)
+    endif()
+endfunction()
+
+# 应用链接配置到所有库目标
+if(BUILD_SHARED_LIBS)
+    configure_nut_linking(nut_shared)
+endif()
+if(BUILD_STATIC_LIBS)
+    configure_nut_linking(nut_static)
 endif()
 
 # 安装库文件
-install(TARGETS nut
-    EXPORT nutTargets
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
+if(BUILD_SHARED_LIBS)
+    install(TARGETS nut_shared
+        EXPORT nutTargets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+endif()
+
+if(BUILD_STATIC_LIBS)
+    install(TARGETS nut_static
+        EXPORT nutTargets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+endif()
 
 # 为开发构建创建符号链接（仅Unix系统的动态库）
-if(UNIX AND NOT APPLE AND NUT_LIBRARY_TYPE STREQUAL "SHARED")
-    add_custom_command(TARGET nut POST_BUILD
+if(UNIX AND NOT APPLE AND BUILD_SHARED_LIBS)
+    add_custom_command(TARGET nut_shared POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E create_symlink
-        $<TARGET_FILE:nut>
+        $<TARGET_FILE:nut_shared>
         ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libnut.so
         COMMENT "Creating symlink for nut library"
     )
@@ -147,32 +153,47 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     endif()
 endif()
 
-# 编译警告设置
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(nut PRIVATE
-        -Wall -Wextra -Wpedantic
-        -Wno-unused-parameter
-        -Wno-missing-field-initializers
-    )
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    target_compile_options(nut PRIVATE
-        -Wall -Wextra -Wpedantic
-        -Wno-unused-parameter
-        -Wno-missing-field-initializers
-        -Wno-gnu-zero-variadic-macro-arguments
-    )
-elseif(MSVC)
-    target_compile_options(nut PRIVATE
-        /W3
-        /wd4996  # 禁用已弃用函数警告
-        /wd4267  # 禁用size_t转换警告
-        /wd4244  # 禁用类型转换警告
-    )
+# 编译警告设置函数
+function(configure_nut_warnings target_name)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(${target_name} PRIVATE
+            -Wall -Wextra -Wpedantic
+            -Wno-unused-parameter
+            -Wno-missing-field-initializers
+        )
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        target_compile_options(${target_name} PRIVATE
+            -Wall -Wextra -Wpedantic
+            -Wno-unused-parameter
+            -Wno-missing-field-initializers
+            -Wno-gnu-zero-variadic-macro-arguments
+        )
+    elseif(MSVC)
+        target_compile_options(${target_name} PRIVATE
+            /W3
+            /wd4996  # 禁用已弃用函数警告
+            /wd4267  # 禁用size_t转换警告
+            /wd4244  # 禁用类型转换警告
+        )
+    endif()
+endfunction()
+
+# 应用警告配置到所有库目标
+if(BUILD_SHARED_LIBS)
+    configure_nut_warnings(nut_shared)
+endif()
+if(BUILD_STATIC_LIBS)
+    configure_nut_warnings(nut_static)
 endif()
 
 # 输出库信息
 message(STATUS "NUT Library Configuration:")
-message(STATUS "  Library Type: ${NUT_LIBRARY_TYPE}")
+if(BUILD_SHARED_LIBS)
+    message(STATUS "  Building: Shared Library")
+endif()
+if(BUILD_STATIC_LIBS)
+    message(STATUS "  Building: Static Library")
+endif()
 message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  Sources: ${SOURCE_COUNT} files")
 message(STATUS "  Headers: ${HEADER_COUNT} files")
