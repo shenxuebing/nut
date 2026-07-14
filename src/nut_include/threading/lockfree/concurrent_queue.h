@@ -14,6 +14,21 @@
 #include "hazard_pointer/hp_retire_list.h"
 
 
+// 兼容性补丁：GCC 4.8/4.9 的 libstdc++ 未实现 std::is_trivially_copyable，
+// 这里用编译器内置扩展 __has_trivial_copy 做 fallback。
+// 说明：__has_trivial_copy 语义与 is_trivially_copyable 接近（均判定可平凡拷贝），
+//       仅在老编译器下启用，GCC 5.0 及以上仍走标准实现，行为不受影响。
+#if defined(__GNUC__) && !defined(__clang__) && (__GNUC__ < 5) && !defined(_MSC_VER)
+#   if !defined(__cpp_lib_is_trivially_copyable)
+#       define NUT_IS_TRIVIALLY_COPYABLE(TT) (__has_trivial_copy(TT))
+#   else
+#       define NUT_IS_TRIVIALLY_COPYABLE(TT) (std::is_trivially_copyable<TT>::value)
+#   endif
+#else
+#   define NUT_IS_TRIVIALLY_COPYABLE(TT) (std::is_trivially_copyable<TT>::value)
+#endif
+
+
 // 隐消数组的指针常量
 #define COLLISION_EMPTY_PTR nullptr
 #define COLLISION_DONE_PTR (reinterpret_cast<Node*>(-1))
@@ -63,11 +78,11 @@ private:
     {
     public:
         typedef typename std::conditional<
-            std::is_trivially_copyable<T>::value, T, T*>::type data_store_type;
+            NUT_IS_TRIVIALLY_COPYABLE(T), T, T*>::type data_store_type;
 
     public:
         template <typename TT=T>
-        typename std::enable_if<std::is_trivially_copyable<TT>::value, void>::type
+        typename std::enable_if<NUT_IS_TRIVIALLY_COPYABLE(TT), void>::type
         construct_plump(const T& v) noexcept
         {
             construct_dummy();
@@ -76,7 +91,7 @@ private:
         }
 
         template <typename TT=T>
-        typename std::enable_if<!std::is_trivially_copyable<TT>::value, void>::type
+        typename std::enable_if<!NUT_IS_TRIVIALLY_COPYABLE(TT), void>::type
         construct_plump(T&& v) noexcept
         {
             construct_dummy();
@@ -86,7 +101,7 @@ private:
         }
 
         template <typename TT=T>
-        typename std::enable_if<!std::is_trivially_copyable<TT>::value, void>::type
+        typename std::enable_if<!NUT_IS_TRIVIALLY_COPYABLE(TT), void>::type
         construct_plump(const T& v) noexcept
         {
             construct_dummy();
@@ -112,14 +127,14 @@ private:
         }
 
         template <typename TT=T>
-        typename std::enable_if<std::is_trivially_copyable<TT>::value, void>::type
+        typename std::enable_if<NUT_IS_TRIVIALLY_COPYABLE(TT), void>::type
         destruct_plump() noexcept
         {
             destruct_dummy();
         }
 
         template <typename TT=T>
-        typename std::enable_if<!std::is_trivially_copyable<TT>::value, void>::type
+        typename std::enable_if<!NUT_IS_TRIVIALLY_COPYABLE(TT), void>::type
         destruct_plump() noexcept
         {
             destruct_dummy();
@@ -146,7 +161,7 @@ private:
         }
 
         template <typename TT=T>
-        static typename std::enable_if<std::is_trivially_copyable<TT>::value, void>::type
+        static typename std::enable_if<NUT_IS_TRIVIALLY_COPYABLE(TT), void>::type
         move_data(data_store_type *src, T *dst) noexcept
         {
             assert(nullptr != src);
@@ -155,7 +170,7 @@ private:
         }
 
         template <typename TT=T>
-        static typename std::enable_if<!std::is_trivially_copyable<TT>::value, void>::type
+        static typename std::enable_if<!NUT_IS_TRIVIALLY_COPYABLE(TT), void>::type
         move_data(data_store_type *src, T *dst) noexcept
         {
             assert(nullptr != src && nullptr != *src);
@@ -164,7 +179,7 @@ private:
         }
 
         template <typename TT=T>
-        static typename std::enable_if<std::is_trivially_copyable<TT>::value, void>::type
+        static typename std::enable_if<NUT_IS_TRIVIALLY_COPYABLE(TT), void>::type
         move_and_destroy_data(data_store_type *src, T *dst) noexcept
         {
             assert(nullptr != src);
@@ -174,7 +189,7 @@ private:
         }
 
         template <typename TT=T>
-        static typename std::enable_if<!std::is_trivially_copyable<TT>::value, void>::type
+        static typename std::enable_if<!NUT_IS_TRIVIALLY_COPYABLE(TT), void>::type
         move_and_destroy_data(data_store_type *src, T *dst) noexcept
         {
             assert(nullptr != src && nullptr != *src);

@@ -21,9 +21,14 @@ namespace nut
  * NOTE 注意避免中间过程溢出
  *
  * @return a * b % n
+ *
+ * NOTE 不加 'constexpr'：uint128_t/uint64_t 的显式特化实现是复杂多语句，
+ *      无法成为 constexpr 函数。主模板若带 constexpr 会与特化的签名冲突
+ *      (C++11 严格要求特化与主模板签名一致)，GCC 4.8.5 及更严格的编译器会报错。
+ *      且项目代码无任何处依赖 mul_mod 的编译期求值，去掉 constexpr 无副作用。
  */
 template <typename T>
-constexpr T mul_mod(T a, T b, T n) noexcept
+T mul_mod(T a, T b, T n) noexcept
 {
     static_assert(std::is_unsigned<T>::value, "Unexpected integer type");
     typedef typename StdInt<T>::double_unsigned_type dword_type;
