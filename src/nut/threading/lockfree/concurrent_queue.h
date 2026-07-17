@@ -7,6 +7,7 @@
 #include <atomic>
 #include <thread>
 #include <random>
+#include <type_traits>
 
 #include "../../platform/sys.h"
 #include "stamped_ptr.h"
@@ -14,20 +15,25 @@
 #include "hazard_pointer/hp_retire_list.h"
 
 
-// 兼容性补丁：GCC 4.8/4.9 的 libstdc++ 未实现 std::is_trivially_copyable，
-// 这里用编译器内置扩展 __has_trivial_copy 做 fallback。
-// 说明：__has_trivial_copy 语义与 is_trivially_copyable 接近（均判定可平凡拷贝），
-//       仅在老编译器下启用，GCC 5.0 及以上仍走标准实现，行为不受影响。
+namespace nut
+{
+namespace detail
+{
+
 #if defined(__GNUC__) && !defined(__clang__) && (__GNUC__ < 5) && !defined(_MSC_VER)
-#   if !defined(__cpp_lib_is_trivially_copyable)
-#       define NUT_IS_TRIVIALLY_COPYABLE(TT) (__has_trivial_copy(TT))
-#   else
-#       define NUT_IS_TRIVIALLY_COPYABLE(TT) (std::is_trivially_copyable<TT>::value)
-#   endif
+template <typename TT>
+struct is_trivially_copyable : std::integral_constant<bool, __has_trivial_copy(TT)>
+{};
 #else
-#   define NUT_IS_TRIVIALLY_COPYABLE(TT) (std::is_trivially_copyable<TT>::value)
+template <typename TT>
+struct is_trivially_copyable : std::is_trivially_copyable<TT>
+{};
 #endif
 
+}
+}
+
+#define NUT_IS_TRIVIALLY_COPYABLE(TT) (::nut::detail::is_trivially_copyable<TT>::value)
 
 // 隐消数组的指针常量
 #define COLLISION_EMPTY_PTR nullptr

@@ -73,9 +73,7 @@ elseif(PLATFORM_WINDOWS)
 endif()
 
 # C++标准库链接
-if(NOT PLATFORM_DARWIN AND NOT PLATFORM_WINDOWS)
-    target_link_libraries(test_nut PRIVATE stdc++)
-elseif(PLATFORM_DARWIN)
+if(PLATFORM_DARWIN)
     target_link_libraries(test_nut PRIVATE c++)
 endif()
 
@@ -158,4 +156,3 @@ if(PLATFORM_LINUX AND VALGRIND_EXECUTABLE)
 else()
     message(STATUS "  Valgrind Available: NO")
 endif()
-

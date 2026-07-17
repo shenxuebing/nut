@@ -98,9 +98,6 @@ function(configure_nut_linking target_name)
         if(DL_LIBRARY)
             target_link_libraries(${target_name} PUBLIC ${DL_LIBRARY})
         endif()
-        
-        target_link_libraries(${target_name} PUBLIC stdc++)
-        
     elseif(PLATFORM_DARWIN)
         target_link_libraries(${target_name} PUBLIC "-framework Foundation")
         target_link_libraries(${target_name} PUBLIC c++)

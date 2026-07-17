@@ -109,7 +109,7 @@ void* lengthfixed_mtmp::alloc(size_t sz) noexcept
     void *old_head = _head.load(std::memory_order_acquire);
     while (nullptr != old_head && !_head.compare_exchange_weak(
                old_head, *reinterpret_cast<void**>(old_head),
-               std::memory_order_relaxed, std::memory_order_acquire))
+               std::memory_order_acquire, std::memory_order_relaxed))
     {}
 
     if (nullptr == old_head)

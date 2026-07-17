@@ -47,7 +47,7 @@ T inverse_of_coprime_mod(T a, T n) noexcept
      *      pow_mod(a, n - 2, n) 来求(因为 pow_mod(a, n - 1, n) == 1)
      */
     sword_type ret;
-    const T gcd = extended_euclid(a, n, &ret, nullptr);
+    const T gcd = extended_euclid(a, n, &ret, static_cast<sword_type*>(nullptr));
     assert(1 == gcd);
     if (ret < 0)
     {

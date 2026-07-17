@@ -56,6 +56,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+option(NUT_STATIC_LIBSTDCXX "Link libstdc++ statically when the static archive is available" ON)
+
 # 设置构建类型
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
@@ -175,9 +177,21 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang
     elseif(PLATFORM_LINUX)
         add_compile_options(-rdynamic)
         add_link_options(-rdynamic)
-        
-        # Linux下生成动态库时将libstdc++静态库打入
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++")
+        string(REPLACE "-static-libstdc++" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+
+        if(NUT_STATIC_LIBSTDCXX AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            execute_process(
+                COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libstdc++.a
+                OUTPUT_VARIABLE NUT_LIBSTDCXX_STATIC
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+            if(NUT_LIBSTDCXX_STATIC AND EXISTS "${NUT_LIBSTDCXX_STATIC}")
+                set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libstdc++")
+                message(STATUS "NUT: static libstdc++ enabled: ${NUT_LIBSTDCXX_STATIC}")
+            else()
+                message(STATUS "NUT: static libstdc++ not found; using compiler default libstdc++ linkage")
+            endif()
+        endif()
     endif()
 endif()
 
@@ -285,4 +299,3 @@ endif()
 message(STATUS "  Install Prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "  Library Directory: ${CMAKE_INSTALL_LIBDIR}")
 message(STATUS "  Include Directory: ${CMAKE_INSTALL_INCLUDEDIR}")
-

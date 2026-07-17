@@ -99,7 +99,7 @@ public:
 
             if (_top.compare_exchange_weak(
                     &old_top, {old_top.ptr->next, old_top.stamp + 1},
-                    std::memory_order_relaxed, std::memory_order_acquire))
+                    std::memory_order_acquire, std::memory_order_relaxed))
             {
                 if (nullptr != p)
                     *p = std::move(old_top.ptr->data);
