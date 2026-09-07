@@ -5,6 +5,8 @@
 #include <stdarg.h> /* for va_start() */
 #include <stdlib.h> /* for malloc() free() ltoa() wcstombs() and so on */
 #include <wchar.h>
+#include <errno.h>
+#include <iconv.h>
 
 #include "../../platform/platform.h"
 
@@ -28,6 +30,46 @@
 
 namespace nut
 {
+
+static std::string iconv_convert(const char *str, size_t len, const char *from_code,
+                                 const char *to_code)
+{
+    assert(nullptr != str && nullptr != from_code && nullptr != to_code);
+
+    iconv_t cd = ::iconv_open(to_code, from_code);
+    if ((iconv_t) -1 == cd)
+        return std::string();
+
+    std::string result;
+    result.resize(len * 4 + 16);
+
+    char *inbuf = const_cast<char*>(str);
+    size_t inbytesleft = len;
+    char *outbuf = &result[0];
+    size_t outbytesleft = result.size();
+    while (true)
+    {
+        if ((size_t) -1 != ::iconv(cd, &inbuf, &inbytesleft, &outbuf, &outbytesleft))
+        {
+            result.resize((size_t) (outbuf - &result[0]));
+            break;
+        }
+
+        if (E2BIG != errno)
+        {
+            result.clear();
+            break;
+        }
+
+        const size_t used = (size_t) (outbuf - &result[0]);
+        result.resize(result.size() * 2 + 16);
+        outbuf = &result[0] + used;
+        outbytesleft = result.size() - used;
+    }
+
+    ::iconv_close(cd);
+    return result;
+}
 
 /**
  * 用整个字符串来分割字符串
@@ -683,6 +725,56 @@ NUT_API std::string wstr_to_utf8(const std::wstring& wstr)
     return wstr_to_utf8(wstr.c_str());
 }
 
+NUT_API std::wstring path_to_wstr(const char *str)
+{
+    assert(nullptr != str);
+
+#if NUT_PLATFORM_OS_WINDOWS && defined(NUT_PATH_GGBK)
+    // 存量 GBK 工程：路径字节按 GBK(936) 显式转换，与系统 ACP 无关
+    std::wstring result;
+    const int n = ::MultiByteToWideChar(936, 0, str, -1, nullptr, 0);
+    if (n <= 0)
+        return result; // failed
+    result.resize(n - 1);
+    const int rs = ::MultiByteToWideChar(936, 0, str, -1,
+                                         const_cast<wchar_t*>(result.data()), n);
+    assert(rs > 0); // success
+    return result;
+#else
+    // 默认约定：路径字节为 UTF-8
+    return utf8_to_wstr(str);
+#endif
+}
+
+NUT_API std::wstring path_to_wstr(const std::string& str)
+{
+    return path_to_wstr(str.c_str());
+}
+
+NUT_API std::string wstr_to_path(const wchar_t *wstr)
+{
+    assert(nullptr != wstr);
+
+#if NUT_PLATFORM_OS_WINDOWS && defined(NUT_PATH_GGBK)
+    std::string result;
+    const int n = ::WideCharToMultiByte(936, 0, wstr, -1, nullptr, 0, nullptr, nullptr);
+    if (n <= 0)
+        return result; // failed
+    result.resize(n - 1);
+    const int rs = ::WideCharToMultiByte(936, 0, wstr, -1,
+                                         const_cast<char*>(result.data()), n, nullptr, nullptr);
+    assert(rs > 0); // success
+    return result;
+#else
+    return wstr_to_utf8(wstr);
+#endif
+}
+
+NUT_API std::string wstr_to_path(const std::wstring& wstr)
+{
+    return wstr_to_path(wstr.c_str());
+}
+
 NUT_API std::string ascii_to_utf8(const char *str)
 {
     assert(nullptr != str);
@@ -713,6 +805,28 @@ NUT_API std::string utf8_to_ascii(const char *str)
 NUT_API std::string utf8_to_ascii(const std::string& str)
 {
     return utf8_to_ascii(str.c_str());
+}
+
+NUT_API std::string gbk_to_utf8(const char *str)
+{
+    assert(nullptr != str);
+    return iconv_convert(str, ::strlen(str), "GBK", "UTF-8");
+}
+
+NUT_API std::string gbk_to_utf8(const std::string& str)
+{
+    return iconv_convert(str.data(), str.length(), "GBK", "UTF-8");
+}
+
+NUT_API std::string utf8_to_gbk(const char *str)
+{
+    assert(nullptr != str);
+    return iconv_convert(str, ::strlen(str), "UTF-8", "GBK");
+}
+
+NUT_API std::string utf8_to_gbk(const std::string& str)
+{
+    return iconv_convert(str.data(), str.length(), "UTF-8", "GBK");
 }
 
 NUT_API std::string xml_encode(const char *s, ssize_t len)

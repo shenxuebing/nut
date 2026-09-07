@@ -15,7 +15,11 @@ bool SourceLocation::operator==(const SourceLocation& x) const noexcept
 
     if (_path != x._path)
     {
-        assert(nullptr != _path && nullptr != x._path);
+        // NOTE 与下方 _func 分支保持一致的空安全写法：空 SourceLocation 与
+        //      非空对象比较是合法场景，此前直接 strcmp 空指针会导致断言失败/
+        //      崩溃，且 Debug 构建下 CRT 断言弹窗会使无人值守测试挂死
+        if (nullptr == _path || nullptr == x._path)
+            return false;
         if (0 != ::strcmp(_path, x._path))
             return false;
     }

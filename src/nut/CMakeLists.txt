@@ -16,6 +16,12 @@ list(LENGTH NUT_SOURCES SOURCE_COUNT)
 list(LENGTH NUT_HEADERS HEADER_COUNT)
 message(STATUS "Found ${SOURCE_COUNT} source files and ${HEADER_COUNT} header files for nut library")
 
+set(NUT_THIRD_PARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party")
+set(NUT_ICONV_ROOT "${NUT_THIRD_PARTY_DIR}/libiconv")
+if(NOT TARGET nut::iconv_objects)
+    add_subdirectory("${NUT_ICONV_ROOT}" "${CMAKE_BINARY_DIR}/third_party/libiconv")
+endif()
+
 # 根据配置创建库（支持同时构建动态库和静态库）
 if(BUILD_SHARED_LIBS)
     add_library(nut_shared SHARED ${NUT_SOURCES} ${NUT_HEADERS})
@@ -75,12 +81,28 @@ function(configure_nut_target target_name)
     )
 endfunction()
 
+function(configure_nut_iconv target_name)
+    target_sources(${target_name} PRIVATE $<TARGET_OBJECTS:nut::iconv_objects>)
+    if(WIN32)
+        target_include_directories(${target_name} PRIVATE "${NUT_ICONV_ROOT}/include")
+    else()
+        target_include_directories(${target_name} PRIVATE
+            "${NUT_ICONV_ROOT}/generated/linux/include"
+            "${NUT_ICONV_ROOT}/generated/linux"
+        )
+    endif()
+    target_compile_definitions(${target_name} PRIVATE USING_STATIC_LIBICONV)
+    message(STATUS "NUT: ${target_name} embeds bundled libiconv")
+endfunction()
+
 # 应用配置到所有库目标
 if(BUILD_SHARED_LIBS)
     configure_nut_target(nut_shared)
+    configure_nut_iconv(nut_shared)
 endif()
 if(BUILD_STATIC_LIBS)
     configure_nut_target(nut_static)
+    configure_nut_iconv(nut_static)
 endif()
 
 # 平台特定的链接库配置函数

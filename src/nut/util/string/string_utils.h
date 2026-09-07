@@ -143,6 +143,24 @@ NUT_API std::string ascii_to_utf8(const std::string& str);
 NUT_API std::string utf8_to_ascii(const char *str);
 NUT_API std::string utf8_to_ascii(const std::string& str);
 
+NUT_API std::string gbk_to_utf8(const char *str);
+NUT_API std::string gbk_to_utf8(const std::string& str);
+NUT_API std::string utf8_to_gbk(const char *str);
+NUT_API std::string utf8_to_gbk(const std::string& str);
+
+/**
+ * 路径编码适配
+ *
+ * 窄字符路径的编码约定与系统 ACP 无关：
+ * - 默认约定为 UTF-8（跨平台统一，与 Linux 行为一致）
+ * - 存量 GBK 工程可定义 NUT_PATH_GGBK 宏，声明路径字节为 GBK(936)
+ * 两种模式均使用显式代码页转换，系统无论 GBK 还是 UTF-8 设置均可正确创建中文文件/目录
+ */
+NUT_API std::wstring path_to_wstr(const char *str);
+NUT_API std::wstring path_to_wstr(const std::string& str);
+NUT_API std::string wstr_to_path(const wchar_t *wstr);
+NUT_API std::string wstr_to_path(const std::wstring& wstr);
+
 /**
  * Convert 1 to '1', 15 to 'f' or 'F'
  *

@@ -38,7 +38,14 @@ void CircleFileBySizeLogHandler::reopen(const char *file) noexcept
 
     _ofs.close();
     _ofs.clear();
+#if NUT_PLATFORM_OS_WINDOWS && defined(_MSC_VER)
+    // MSVC 的 ofstream 支持宽字符文件名重载；按路径编码约定显式转换，
+    // 避免中文日志路径被系统 ACP 解释导致乱码
+    // (MinGW/libstdc++ 无宽字符重载，仍走窄字符，需依赖 UTF-8 manifest 方案)
+    _ofs.open(path_to_wstr(file).c_str(), std::ios::app);
+#else
     _ofs.open(file, std::ios::app);
+#endif
 
     if (_file_size > 0)
     {

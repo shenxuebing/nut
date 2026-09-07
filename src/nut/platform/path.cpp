@@ -28,10 +28,12 @@ namespace nut
 std::string Path::get_cwd() noexcept
 {
 #if NUT_PLATFORM_OS_WINDOWS
-    char buf[MAX_PATH + 1];
+    // 窄字符版 CRT 接口返回按 ACP 解释的字节，统一改走宽字符版并按路径编码
+    // 约定转回，保证中文工作目录在 GBK/UTF-8 系统下均不乱码
+    wchar_t buf[MAX_PATH + 1];
     buf[0] = 0;
-    ::_getcwd(buf, MAX_PATH + 1); // MSVC says name of 'getcwd()' is deprecated
-    return buf;
+    ::_wgetcwd(buf, MAX_PATH + 1);
+    return wstr_to_path(buf);
 #else
     char buf[PATH_MAX + 1];
     buf[0] = 0;
@@ -57,7 +59,7 @@ void Path::chdir(const std::string& cwd) noexcept
     const std::string fullpath = Path::abspath(cwd);
 
 #if NUT_PLATFORM_OS_WINDOWS
-    ::_chdir(fullpath.c_str());
+    ::_wchdir(path_to_wstr(fullpath).c_str());
 #else
     ::chdir(fullpath.c_str());
 #endif
@@ -942,7 +944,7 @@ bool Path::exists(const std::string& path) noexcept
     const std::string fullpath = Path::abspath(path);
 
 #if NUT_PLATFORM_OS_WINDOWS
-    return -1 != ::_access(fullpath.c_str(), 0);
+    return -1 != ::_waccess(path_to_wstr(fullpath).c_str(), 0);
 #else
     return 0 == ::access(fullpath.c_str(), F_OK); // F_OK 检查存在性
 #endif
@@ -991,7 +993,7 @@ time_t Path::get_atime(const std::string& path) noexcept
 
 #if NUT_PLATFORM_OS_WINDOWS
     struct _stat info;
-    ::_stat(fullpath.c_str(), &info);
+    ::_wstat(path_to_wstr(fullpath).c_str(), &info);
     return info.st_atime;
 #else
     struct stat info;
@@ -1039,7 +1041,7 @@ time_t Path::get_mtime(const std::string& path) noexcept
 
 #if NUT_PLATFORM_OS_WINDOWS
     struct _stat info;
-    ::_stat(fullpath.c_str(), &info);
+    ::_wstat(path_to_wstr(fullpath).c_str(), &info);
     return info.st_mtime;
 #else
     struct stat info;
@@ -1087,7 +1089,7 @@ time_t Path::get_ctime(const std::string& path) noexcept
 
 #if NUT_PLATFORM_OS_WINDOWS
     struct _stat info;
-    ::_stat(fullpath.c_str(), &info);
+    ::_wstat(path_to_wstr(fullpath).c_str(), &info);
     return info.st_ctime;
 #else
     struct stat info;
@@ -1135,7 +1137,7 @@ long long Path::get_size(const std::string& path) noexcept
 
 #if NUT_PLATFORM_OS_WINDOWS
     struct _stat info;
-    ::_stat(fullpath.c_str(), &info);
+    ::_wstat(path_to_wstr(fullpath).c_str(), &info);
     return info.st_size;
 #else
     struct stat info;
@@ -1184,7 +1186,10 @@ bool Path::is_dir(const std::string& path) noexcept
     const std::string fullpath = Path::abspath(path);
 
 #if NUT_PLATFORM_OS_WINDOWS
-    return 0 != (FILE_ATTRIBUTE_DIRECTORY & ::GetFileAttributesA(fullpath.c_str()));
+    // NOTE 路径不存在时 GetFileAttributesW() 返回 INVALID_FILE_ATTRIBUTES(全 1)，
+    //      直接按位与会误判为目录，需显式排除以保持与 Linux 分支 stat 语义一致
+    const DWORD attr = ::GetFileAttributesW(path_to_wstr(fullpath).c_str());
+    return INVALID_FILE_ATTRIBUTES != attr && 0 != (FILE_ATTRIBUTE_DIRECTORY & attr);
 #else
     struct stat info;
     if (0 != ::stat(fullpath.c_str(), &info))
@@ -1196,7 +1201,9 @@ bool Path::is_dir(const std::string& path) noexcept
 bool Path::is_dir(const std::wstring& path) noexcept
 {
 #if NUT_PLATFORM_OS_WINDOWS
-    return 0 != (FILE_ATTRIBUTE_DIRECTORY & ::GetFileAttributesW(Path::abspath(path).c_str()));
+    // NOTE 同上，显式排除 INVALID_FILE_ATTRIBUTES
+    const DWORD attr = ::GetFileAttributesW(Path::abspath(path).c_str());
+    return INVALID_FILE_ATTRIBUTES != attr && 0 != (FILE_ATTRIBUTE_DIRECTORY & attr);
 #else
     return Path::is_dir(wstr_to_ascii(path));
 #endif
@@ -1207,7 +1214,9 @@ bool Path::is_file(const std::string& path) noexcept
     const std::string fullpath = Path::abspath(path);
 
 #if NUT_PLATFORM_OS_WINDOWS
-    return 0 == (FILE_ATTRIBUTE_DIRECTORY & ::GetFileAttributesA(fullpath.c_str()));
+    // NOTE 同 is_dir()，显式排除不存在的路径
+    const DWORD attr = ::GetFileAttributesW(path_to_wstr(fullpath).c_str());
+    return INVALID_FILE_ATTRIBUTES != attr && 0 == (FILE_ATTRIBUTE_DIRECTORY & attr);
 #else
     struct stat info;
     if (0 != ::stat(fullpath.c_str(), &info))
@@ -1219,7 +1228,9 @@ bool Path::is_file(const std::string& path) noexcept
 bool Path::is_file(const std::wstring& path) noexcept
 {
 #if NUT_PLATFORM_OS_WINDOWS
-    return 0 == (FILE_ATTRIBUTE_DIRECTORY & ::GetFileAttributesW(Path::abspath(path).c_str()));
+    // NOTE 同上，显式排除不存在的路径
+    const DWORD attr = ::GetFileAttributesW(Path::abspath(path).c_str());
+    return INVALID_FILE_ATTRIBUTES != attr && 0 == (FILE_ATTRIBUTE_DIRECTORY & attr);
 #else
     return Path::is_file(wstr_to_ascii(path));
 #endif
@@ -1230,11 +1241,11 @@ std::string Path::get_tmpDir()noexcept
 {
     std::string dirPath;
 #if NUT_PLATFORM_OS_WINDOWS
-    char tmpPath[MAX_PATH] = { 0 };
-    if (GetTempPathA(MAX_PATH, tmpPath)>0)
+    wchar_t tmpPath[MAX_PATH] = { 0 };
+    if (GetTempPathW(MAX_PATH, tmpPath)>0)
     {
-        dirPath = tmpPath;
-    }    
+        dirPath = wstr_to_path(tmpPath);
+    }
 #else
     dirPath = "/tmp/";
 #endif

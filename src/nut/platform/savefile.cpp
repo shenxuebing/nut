@@ -15,6 +15,7 @@
 #include "savefile.h"
 #include "path.h"
 #include "os.h"
+#include "../util/string/string_utils.h" // for path_to_wstr()
 
 
 namespace nut
@@ -41,7 +42,9 @@ bool SaveFile::open() noexcept
 {
 #if NUT_PLATFORM_OS_WINDOWS
     assert(INVALID_HANDLE_VALUE == _handle);
-    _handle = ::CreateFileA(_tmp_path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    // 按 UTF-8(或 NUT_PATH_GGBK 约定) 显式转换后走宽字符 API，
+    // 避免窄字符路径被系统 ACP 解释导致中文文件名乱码
+    _handle = ::CreateFileW(path_to_wstr(_tmp_path).c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     return INVALID_HANDLE_VALUE != _handle;
 #else
     assert(_fd < 0);

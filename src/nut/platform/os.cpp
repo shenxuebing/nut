@@ -48,22 +48,22 @@ namespace nut
 
 #if NUT_PLATFORM_OS_WINDOWS
         const std::string search_path = abspath + "\\*"; /* 加上通配符 */
-        WIN32_FIND_DATAA wfd;
-        const HANDLE hfind = ::FindFirstFileA(search_path.c_str(), &wfd);
+        WIN32_FIND_DATAW wfd;
+        const HANDLE hfind = ::FindFirstFileW(path_to_wstr(search_path).c_str(), &wfd);
         if (INVALID_HANDLE_VALUE == hfind)
             return result;
 
         do
         {
-            if (exclude_initial_dot && '.' == wfd.cFileName[0])
+            if (exclude_initial_dot && L'.' == wfd.cFileName[0])
                 continue;
             if (exclude_file && !(wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
                 continue;
             if (exclude_dir && (wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
                 continue;
 
-            result.emplace_back(wfd.cFileName);
-        } while (::FindNextFileA(hfind, &wfd));
+            result.emplace_back(wstr_to_path(wfd.cFileName));
+        } while (::FindNextFileW(hfind, &wfd));
 
         // 关闭查找句柄
         ::FindClose(hfind);
@@ -143,7 +143,7 @@ namespace nut
         const std::string abssrc = Path::abspath(src), absdst = Path::abspath(dst);
 
 #if NUT_PLATFORM_OS_WINDOWS
-        return FALSE != ::CopyFileA(abssrc.c_str(), absdst.c_str(), FALSE);
+        return FALSE != ::CopyFileW(path_to_wstr(abssrc).c_str(), path_to_wstr(absdst).c_str(), FALSE);
 #elif NUT_PLATFORM_OS_MACOS
         return 0 == ::copyfile(abssrc.c_str(), absdst.c_str(), nullptr, COPYFILE_ALL | COPYFILE_NOFOLLOW);
 #elif NUT_PLATFORM_OS_LINUX
@@ -235,7 +235,7 @@ namespace nut
         const std::string abspath = Path::abspath(path);
 
 #if NUT_PLATFORM_OS_WINDOWS
-        return FALSE != ::DeleteFileA(abspath.c_str());
+        return FALSE != ::DeleteFileW(path_to_wstr(abspath).c_str());
 #else
         return 0 == ::remove(abspath.c_str());
 #endif
@@ -255,7 +255,7 @@ namespace nut
         const std::string abspath = Path::abspath(path);
 
 #if NUT_PLATFORM_OS_WINDOWS
-        return FALSE != ::CreateDirectoryA(abspath.c_str(), nullptr);
+        return FALSE != ::CreateDirectoryW(path_to_wstr(abspath).c_str(), nullptr);
 #else
         return 0 == ::mkdir(abspath.c_str(), S_IREAD | S_IWRITE | S_IEXEC);
 #endif
@@ -299,7 +299,7 @@ namespace nut
         const std::string abspath = Path::abspath(path);
 
 #if NUT_PLATFORM_OS_WINDOWS
-        return FALSE != ::RemoveDirectoryA(abspath.c_str());
+        return FALSE != ::RemoveDirectoryW(path_to_wstr(abspath).c_str());
 #else
         return 0 == ::rmdir(abspath.c_str());
 #endif
@@ -320,13 +320,13 @@ namespace nut
 
 #if NUT_PLATFORM_OS_WINDOWS
         // 删除文件
-        if (0 == (FILE_ATTRIBUTE_DIRECTORY & ::GetFileAttributesA(abspath.c_str())))
-            return FALSE != ::DeleteFileA(abspath.c_str());
+        if (0 == (FILE_ATTRIBUTE_DIRECTORY & ::GetFileAttributesW(path_to_wstr(abspath).c_str())))
+            return FALSE != ::DeleteFileW(path_to_wstr(abspath).c_str());
 
         // 遍历文件夹
         const std::string search_path = abspath + "\\*"; /* 加上通配符 */
-        WIN32_FIND_DATAA wfd;
-        const HANDLE hfind = ::FindFirstFileA(search_path.c_str(), &wfd);
+        WIN32_FIND_DATAW wfd;
+        const HANDLE hfind = ::FindFirstFileW(path_to_wstr(search_path).c_str(), &wfd);
         if (INVALID_HANDLE_VALUE == hfind)
             return false;
 
@@ -334,19 +334,19 @@ namespace nut
         do
         {
             // 忽略 . 和 ..
-            if (('.' == wfd.cFileName[0] && '\0' == wfd.cFileName[1]) ||
-                ('.' == wfd.cFileName[0] && '.' == wfd.cFileName[1] && '\0' == wfd.cFileName[2]))
+            if ((L'.' == wfd.cFileName[0] && L'\0' == wfd.cFileName[1]) ||
+                (L'.' == wfd.cFileName[0] && L'.' == wfd.cFileName[1] && L'\0' == wfd.cFileName[2]))
                 continue;
 
-            ret = OS::rmtree(Path::join(abspath, wfd.cFileName));
-        } while (ret && ::FindNextFileA(hfind, &wfd));
+            ret = OS::rmtree(Path::join(abspath, wstr_to_path(wfd.cFileName)));
+        } while (ret && ::FindNextFileW(hfind, &wfd));
 
         // 关闭查找句柄
         ::FindClose(hfind);
 
         // 移除空文件夹
         if (ret)
-            ret = (FALSE != ::RemoveDirectoryA(abspath.c_str()));
+            ret = (FALSE != ::RemoveDirectoryW(path_to_wstr(abspath).c_str()));
         return ret;
 #else
         struct stat info;
@@ -473,7 +473,12 @@ namespace nut
 
     bool OS::rename(const std::string& from, const std::string& to) noexcept
     {
+#if NUT_PLATFORM_OS_WINDOWS
+        return 0 == ::_wrename(path_to_wstr(Path::abspath(from)).c_str(),
+                               path_to_wstr(Path::abspath(to)).c_str());
+#else
         return 0 == ::rename(Path::abspath(from).c_str(), Path::abspath(to).c_str());
+#endif
     }
 
     bool OS::rename(const std::wstring& from, const std::wstring& to) noexcept
@@ -500,7 +505,8 @@ namespace nut
     {
 #if NUT_PLATFORM_OS_WINDOWS
         LPVOID buf = NULL;
-        FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, errcode(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&buf, 0, NULL);
+        // 显式使用 FormatMessageA：UNICODE 宏下 FormatMessage 会展开为 W 版，wchar_t* 被强转 char* 导致乱码
+        FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, errcode(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&buf, 0, NULL);
         return (char*)buf;
 #else
         return strerror(errcode());

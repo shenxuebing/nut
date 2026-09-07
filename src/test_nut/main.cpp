@@ -1,6 +1,7 @@
 ﻿
 #include <stdio.h>
 #include <time.h> // for time()
+#include <stdlib.h> // for _set_error_mode()
 #include <iostream>
 
 #include <nut/nut.h> // check if "nut.h" collect the right header files
@@ -76,6 +77,11 @@ void testT1(TimerHeap::timer_id_type a, const TimeDiff& b)
 }
 int main(int argc, char *argv[])
 {
+#if NUT_PLATFORM_OS_WINDOWS
+    // NOTE 让 CRT assert 失败等错误输出到 stderr 并终止，而非弹出模态对话框，
+    //      避免 CI/后台无人值守环境下测试进程无限期挂起
+    _set_error_mode(_OUT_TO_STDERR);
+#endif
 
     TimeWheel t1;
     TimeWheel::timer_id_type id1 = t1.add_timer(100,200, testT);
@@ -85,7 +91,6 @@ int main(int argc, char *argv[])
     nowTime.set(2);
     t2.add_timer(nowTime, testT1);
   //  t2.run();
-    system("pause");
 #if NUT_PLATFORM_OS_LINUX
     // 解决 std::wcout 无法显示中文以及 char/wchar_t 相互转换问题
     ::setlocale(LC_ALL, "zh_CN.UTF8");

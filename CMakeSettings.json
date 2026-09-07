@@ -4,12 +4,39 @@
       "name": "x64-Debug",
       "generator": "Ninja",
       "configurationType": "Debug",
-      "inheritEnvironments": [ "msvc_x64_x64" ],
       "buildRoot": "${projectDir}\\out\\build\\${name}",
       "installRoot": "${projectDir}\\out\\install\\${name}",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
-      "ctestCommandArgs": ""
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "msvc_x64" ],
+      "variables": [
+        {
+          "name": "BUILD_RUNTIME",
+          "value": "MT",
+          "type": "STRING"
+        },
+        {
+          "name": "NUT_RUNTIME_LIBRARY",
+          "value": "MT",
+          "type": "STRING"
+        },
+        {
+          "name": "NUT_LIBRARY_TYPE",
+          "value": "STATIC",
+          "type": "STRING"
+        },
+        {
+          "name": "BUILD_SHARED_LIBS",
+          "value": "False",
+          "type": "BOOL"
+        },
+        {
+          "name": "STATIC_CRT",
+          "value": "True",
+          "type": "BOOL"
+        }
+      ]
     },
     {
       "name": "x86-Debug",
@@ -21,7 +48,119 @@
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "msvc_x86" ],
-      "variables": []
+      "variables": [
+        {
+          "name": "BUILD_RUNTIME",
+          "value": "MT",
+          "type": "STRING"
+        },
+        {
+          "name": "NUT_RUNTIME_LIBRARY",
+          "value": "MT",
+          "type": "STRING"
+        },
+        {
+          "name": "NUT_LIBRARY_TYPE",
+          "value": "STATIC",
+          "type": "STRING"
+        },
+        {
+          "name": "BUILD_SHARED_LIBS",
+          "value": "False",
+          "type": "BOOL"
+        },
+        {
+          "name": "STATIC_CRT",
+          "value": "True",
+          "type": "BOOL"
+        },
+        {
+          "name": "BUILD_STATIC_LIBS",
+          "value": "True",
+          "type": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "x86-Release",
+      "generator": "Ninja",
+      "configurationType": "Release",
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "msvc_x86" ],
+      "variables": [
+        {
+          "name": "BUILD_RUNTIME",
+          "value": "MT",
+          "type": "STRING"
+        },
+        {
+          "name": "NUT_RUNTIME_LIBRARY",
+          "value": "MT",
+          "type": "STRING"
+        },
+        {
+          "name": "NUT_LIBRARY_TYPE",
+          "value": "STATIC",
+          "type": "STRING"
+        },
+        {
+          "name": "STATIC_CRT",
+          "value": "True",
+          "type": "BOOL"
+        },
+        {
+          "name": "BUILD_STATIC_LIBS",
+          "value": "True",
+          "type": "BOOL"
+        },
+        {
+          "name": "BUILD_SHARED_LIBS",
+          "value": "False",
+          "type": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "x64-Release",
+      "generator": "Ninja",
+      "configurationType": "Release",
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "variables": [
+        {
+          "name": "BUILD_RUNTIME",
+          "value": "MT",
+          "type": "STRING"
+        },
+        {
+          "name": "NUT_RUNTIME_LIBRARY",
+          "value": "MT",
+          "type": "STRING"
+        },
+        {
+          "name": "NUT_LIBRARY_TYPE",
+          "value": "STATIC",
+          "type": "STRING"
+        },
+        {
+          "name": "STATIC_CRT",
+          "value": "True",
+          "type": "BOOL"
+        },
+        {
+          "name": "BUILD_STATIC_LIBS",
+          "value": "True",
+          "type": "BOOL"
+        }
+      ]
     }
   ]
 }

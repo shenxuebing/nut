@@ -66,7 +66,14 @@ CircleFileByTimeLogHandler::CircleFileByTimeLogHandler(
     file_name += log_suffix;
 
     const std::string full_path = Path::join(dir_path, file_name);
+#if NUT_PLATFORM_OS_WINDOWS && defined(_MSC_VER)
+    // MSVC 的 ofstream 支持宽字符文件名重载；按路径编码约定显式转换，
+    // 避免中文日志路径被系统 ACP 解释导致乱码
+    // (MinGW/libstdc++ 无宽字符重载，仍走窄字符，需依赖 UTF-8 manifest 方案)
+    _ofs.open(path_to_wstr(full_path).c_str(), std::ios::app); // NOTE 'O_APPEND' 模式打开的文件支持并发写
+#else
     _ofs.open(full_path.c_str(), std::ios::app); // NOTE 'O_APPEND' 模式打开的文件支持并发写
+#endif
 }
 
 void CircleFileByTimeLogHandler::handle_log(const LogRecord& rec) noexcept

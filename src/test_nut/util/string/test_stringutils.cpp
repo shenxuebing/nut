@@ -23,6 +23,7 @@ class TestStringUtils : public TestFixture
         NUT_REGISTER_CASE(test_stricmp);
         NUT_REGISTER_CASE(test_wstr);
         NUT_REGISTER_CASE(test_utf8_ascii_convert);
+        NUT_REGISTER_CASE(test_gbk_utf8_convert);
         NUT_REGISTER_CASE(test_xml_encoding);
         NUT_REGISTER_CASE(test_url_encoding);
         NUT_REGISTER_CASE(test_hex_encoding);
@@ -128,16 +129,19 @@ class TestStringUtils : public TestFixture
 #endif
 
         // NOTE Windows 下
-        // - VC 会在 exe 文件中存储的是 ascii(cp936) 字符串
+        // - VC 传统默认在 exe 文件中存储的是 ascii(cp936) 字符串
+        // - VC 若指定了 /utf-8 编译选项(本工程全局开启)，则存储的是 UTF-8 字节
         // - minGW 默认存储的是 utf8, 除非使用 "-fexec-charset=CP936" 编译参数
 #if NUT_PLATFORM_OS_WINDOWS && NUT_PLATFORM_CC_MINGW
         NUT_TA(wstr_to_utf8(utf8_to_wstr("c5&汉")) == "c5&汉" || // 如果没有指定 "-fexec-charset=CP936"
                wstr_to_ascii(ascii_to_wstr("c5&汉")) == "c5&汉"); // 如果指定了 "-fexec-charset=CP936"
 #else
-        // vc 会将c字符串转编码为 ascii，所以运行时全部为 ascii
-        b = ascii_to_wstr("c5&汉");
+        // 从宽字面量(UTF-16，无编码歧义)运行时生成本机 ACP 字节串再往返，
+        // 使断言不依赖编译选项下窄字面量的实际编码
+        const std::string a0 = wstr_to_ascii(L"c5&汉");
+        b = ascii_to_wstr(a0);
         a = wstr_to_ascii(b);
-        NUT_TA(a == "c5&汉");
+        NUT_TA(a == a0);
 #endif
     }
 
@@ -147,6 +151,15 @@ class TestStringUtils : public TestFixture
         const std::string b = nut::ascii_to_utf8(a);
         const std::string c = nut::utf8_to_ascii(b);
         NUT_TA(c == a);
+    }
+
+    void test_gbk_utf8_convert()
+    {
+        const std::string gbk = "abcd\xD6\xD0\xCE\xC4";
+        const std::string utf8 = "abcd\xE4\xB8\xAD\xE6\x96\x87";
+
+        NUT_TA(gbk_to_utf8(gbk) == utf8);
+        NUT_TA(utf8_to_gbk(utf8) == gbk);
     }
 
     void test_xml_encoding()

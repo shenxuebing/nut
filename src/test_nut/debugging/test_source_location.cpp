@@ -20,8 +20,9 @@ class TestSourceLocation : public TestFixture
     void test_constructor()
     {
         SourceLocation loc(__FILE__, __LINE__, __FUNCTION__);
+        const int constructed_line = __LINE__; // 紧邻构造行的下一行
         NUT_TA(loc.get_file_path() == __FILE__);
-        NUT_TA(loc.get_line_number() == __LINE__ - 1);
+        NUT_TA(loc.get_line_number() == constructed_line - 1);
         NUT_TA(loc.get_function_name() == __FUNCTION__);
 
         SourceLocation loc2("test_file.cpp", 42, "test_func");
@@ -121,13 +122,13 @@ class TestSourceLocation : public TestFixture
     {
         // 测试 NUT_SOURCE_LOCATION 宏
         SourceLocation loc = NUT_SOURCE_LOCATION;
+        const int macro_invoked_line = __LINE__; // 紧邻宏调用的下一行
         NUT_TA(loc.get_file_path() != nullptr);
         NUT_TA(loc.get_line_number() > 0);
         NUT_TA(loc.get_function_name() != nullptr);
 
-        // 验证行号在当前行附近
-        int current_line = __LINE__ - 3; // 减去一些偏移
-        NUT_TA(loc.get_line_number() >= current_line);
+        // 验证宏记录的行号是宏调用所在行(即紧邻基准行的上一行)
+        NUT_TA(loc.get_line_number() == macro_invoked_line - 1);
 
         // 测试 NUT_SOURCE_LOCATION_ARGS 宏（作为参数使用）
         SourceLocation loc2(NUT_SOURCE_LOCATION_ARGS);
